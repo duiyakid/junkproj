@@ -5,7 +5,6 @@ then
 	exit 1
 fi
 
-sudo chmod 1777 /trash
 flag_f=false
 flag_r=false
 flag_R=false
@@ -78,15 +77,35 @@ R_mode(){
         	continue
     	fi
 
+		display=()
+
+		for dis in "${result[@]}"
+		do
+			IFS='|' read -r target_name ori_path <<< "${dis}"
+			local del_time="未知时间"
+            if [ -e "$trash/$target_name" ]
+			then
+                del_time="$(stat -c '%y' "$trash/$target_name" 2>/dev/null | cut -d'.' -f1)"
+            fi
+            display+=("${src_name} ${ori_path} ${del_time}")
+		done
+
 		PS3="请选择要恢复的版本 (输入编号): "
-		select item in "${result[@]}" "cancel"; do
+		select item in "${display[@]}" "cancel"; do
 			if [[ "$item" == "cancel" ]]
 			then
 				echo "操作已取消。"
 				break
 			elif [[ -n "$item" ]]
 			then
-				IFS='|' read -r target_name ori_path <<< "${item}"
+				local index=$((REPLY - 1))
+				IFS='|' read -r target_name ori_path <<< "${result[$index]}"
+
+				if [ -e "${ori_path}" ]
+				then
+					echo "error: 已存在同名文件"
+					continue
+				fi
 				
 				if mv "$trash/$target_name" "$ori_path"
 				then
