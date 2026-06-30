@@ -5,13 +5,13 @@ then
 	exit 1
 fi
 
+sudo chmod 1777 /trash
 flag_f=false
 flag_r=false
 flag_R=false
-trash="./trash"
-delInfo="./trash/delInfo"
+trash="/trash"
+delInfo="/trash/delInfo"
 mode="default"
-# this is a comment
 mkdir -p "$trash"
 
 default_mode(){
