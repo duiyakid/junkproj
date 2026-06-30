@@ -12,11 +12,25 @@ trash="/trash"
 delInfo="/trash/delInfo"
 mode="default"
 mkdir -p "$trash"
-
+check_owner() {
+    local file="$1"
+    local current_user=$(whoami)
+    local file_owner=$(stat -c '%U' "$file" 2>/dev/null)
+    
+    if [ "$file_owner" != "$current_user" ]; then
+        echo "error: permission denied"
+        return 1
+    fi
+    return 0
+}
 default_mode(){
-
 	for file in "$@"
 	do
+		if ! check_owner "$file"
+		then
+			continue
+		fi
+
 		if [ -d "$file" ] && [ "$flag_r" != "true" ]; then
             echo "can't junk dir, use -r instead"
             continue
@@ -44,6 +58,10 @@ default_mode(){
 f_mode(){
 	for file in "$@"
 	do
+		if ! check_owner "$file"
+		then
+			continue
+		fi
 		if [ -d "$file" ] && [ "$flag_r" != "true" ]; then
             echo "can't junk dir, use -r instead"
             continue
@@ -62,7 +80,7 @@ f_mode(){
 R_mode(){
 	OLD_COLUMNS="${COLUMNS}"
 	COLUMNS=1
-	for file in "$@"
+	for file in "$@"a
 	do
 		local src_name="$(basename "${file}")"
 		local target_name="${src_name}"
