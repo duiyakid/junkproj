@@ -11,9 +11,53 @@ trash="./trash"
 delInfo="./trash/delInfo"
 act="mv"
 arg=()
-
+# this is a comment
 mkdir -p "$trash"
 
+default_mode(){
+
+	for file in "$@"
+	do
+		if [ -d "$file" ] && [ "$flag_r" != "true" ]; then
+            echo "can't junk dir, use -r instead"
+            continue
+        fi
+		local src_name="$(basename "${file}")"
+		local src_path="$(realpath -s "${file}")"
+		local target_name="${src_name}"
+		local target_path="$trash/${src_name}"
+		
+        while [ -e "$target_path" ]
+		do
+            target_path="${target_path}_$(date +%s)"
+        done
+
+        if mv "$file" "$target_path"
+		then
+            echo "${target_name}|${src_path}" >> "${delInfo}"
+        else
+            echo "error: failed to junk: $file"
+        fi
+	done
+}
+
+f_mode(){
+	for file in "$@"
+	do
+		if [ -d "$file" ] && [ "$flag_r" != "true" ]; then
+            echo "can't junk dir, use -r instead"
+            continue
+        fi
+
+		local src_path="$(realpath -s "${file}")"
+
+		if ! rm -rf "${src_path}"
+		then
+			echo "error: failed to junk: $file"
+		fi
+
+	done
+}
 while getopts "frR" opt
 do
 	case $opt in

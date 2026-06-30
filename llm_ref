@@ -1,0 +1,145 @@
+#!/bin/bash
+
+# ================= 核心函数定义区 =================
+
+# 1. 恢复文件模式
+restore_file() {
+    local target_name="$1"
+    
+    if [ -z "$target_name" ]; then
+        echo "error: -R requires a file name to restore"
+        exit 1
+    fi
+    
+    local OLD_COLUMNS=$COLUMNS
+    COLUMNS=1
+    
+    mapfile -t matched_records < <(
+        grep "|${target_name}|" "$delInfo" | tac | awk -F'|' '{
+            if (match($1, /_([0-9]+)$/, arr)) {
+                cmd = "date -d @" arr[1] " +\"%Y-%m-%d %H:%M:%S\""
+                cmd | getline readable_date
+                close(cmd)
+                print $1 "|" readable_date "|" $2
+            } else {
+                print $1 "|(未知时间)|" $2
+            }
+        }'
+    )
+
+    if [ ${#matched_records[@]} -eq 0 ]; then
+        echo "未找到名为 '$target_name' 的回收站记录。"
+        exit 1
+    fi
+
+    PS3="请选择要恢复的版本 (输入编号): "
+    select chosen in "${matched_records[@]}" "cancel"; do
+        if [[ "$chosen" == "cancel" ]]; then
+            echo "操作已取消。"
+            break
+        elif [[ -n "$chosen" ]]; then
+            local trash_file=$(echo "$chosen" | awk -F'|' '{print $1}')
+            local orig_path=$(echo "$chosen" | awk -F'|' '{print $3}')
+            
+            if mv "$trash/$trash_file" "$orig_path"; then
+                echo "成功恢复: $orig_path"
+            else
+                echo "恢复失败！请检查目标路径是否存在。"
+            fi
+            break
+        else
+            echo "无效输入，请重新选择。"
+        fi
+    done
+    
+    COLUMNS=$OLD_COLUMNS
+}
+
+# 2. 彻底删除模式
+force_delete() {
+    for file in "$@"; do
+        if [ -d "$file" ]; then
+            rm -rf "$file"
+        else
+            rm -f "$file"
+        fi
+        
+        if [ $? -eq 0 ]; then
+            echo "successfully permanently deleted: $file"
+        else
+            echo "error: failed to delete: $file"
+        fi
+    done
+}
+
+# 3. 默认移入回收站模式
+junk_file() {
+    for file in "$@"; do
+        if [ -d "$file" ] && [ "$flag_r" != "true" ]; then
+            echo "can't junk dir, use -r instead"
+            continue
+        fi
+        
+        local target_name="$(basename "$file")"
+        local abs_path="$(realpath -s "$file")"
+        local target_path="$trash/$target_name"
+        
+        if [ -e "$target_path" ]; then
+            target_path="${target_path}_$(date +%s)"
+        fi
+        
+        if mv "$file" "$target_path"; then
+            echo "${target_name}|${abs_path}" >> "${delInfo}"
+            echo "successfully junked: $file"
+        else
+            echo "error: failed to junk: $file"
+        fi
+    done
+}
+
+# ================= 主流程控制区 =================
+
+if [ $# -eq 0 ]; then
+    echo "error: need at least 1 arg"
+    exit 1
+fi
+
+trash="./trash"
+delInfo="./trash/delInfo"
+mkdir -p "$trash"
+
+mode="junk" 
+flag_r=false
+
+while getopts "frR" opt; do
+    case $opt in
+        f) 
+            if [ "$mode" != "junk" ]; then
+                echo "error: -f, -R, and default mode are mutually exclusive"
+                exit 1
+            fi
+            mode="force" 
+            ;;
+        r) flag_r=true ;;
+        R) 
+            if [ "$mode" != "junk" ]; then
+                echo "error: -f, -R, and default mode are mutually exclusive"
+                exit 1
+            fi
+            mode="restore" 
+            ;;
+        *) 
+            echo "unknown option: -$opt"
+            exit 1
+            ;;
+    esac
+done
+
+shift $((OPTIND - 1))
+
+# 分发执行
+case "$mode" in
+    restore) restore_file "$1" ;;
+    force)   force_delete "$@" ;;
+    junk)    junk_file "$@" ;;
+esac
