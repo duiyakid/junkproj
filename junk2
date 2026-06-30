@@ -2,6 +2,7 @@
 if [ $# -eq 0 ]
 then
 	echo "error: need at least 1 arg"
+	exit 1
 fi
 
 flag_f=false
@@ -9,8 +10,7 @@ flag_r=false
 flag_R=false
 trash="./trash"
 delInfo="./trash/delInfo"
-act="mv"
-arg=()
+mode="default"
 # this is a comment
 mkdir -p "$trash"
 
@@ -29,7 +29,8 @@ default_mode(){
 		
         while [ -e "$target_path" ]
 		do
-            target_path="${target_path}_$(date +%s)"
+			target_name="${src_name}_$(date +%s)"
+            target_path="${trash}/${target_name}"
         done
 
         if mv "$file" "$target_path"
@@ -58,75 +59,78 @@ f_mode(){
 
 	done
 }
-while getopts "frR" opt
-do
-	case $opt in
-		f) flag_f=true ;;
-		r) flag_r=true ;;
-		R) flag_R=true ;;
-		*) echo "unknown option: -$opt";exit 1;;
-	esac
+
+R_mode(){
+	OLD_COLUMNS="${COLUMNS}"
+	COLUMNS=1
+	for file in "$@"
+	do
+		local src_name="$(basename "${file}")"
+		local target_name="${src_name}"
+		local target_path="$trash/${src_name}"
+
+		mapfile -t result < <(
+        grep "${target_name}" "$delInfo" | tac )
+
+		if [ ${#result[@]} -eq 0 ]
+		then
+        	echo "no such file in trash"
+        	continue
+    	fi
+
+		PS3="请选择要恢复的版本 (输入编号): "
+		select item in "${result[@]}" "cancel"; do
+			if [[ "$item" == "cancel" ]]; then
+				echo "操作已取消。"
+				break
+			elif [[ -n "$item" ]]; then
+				IFS='|' read -r target_name ori_path <<< "${item}"
+				
+				if mv "$trash/$target_name" "$ori_path"; then
+					echo "成功恢复: $ori_path"
+				else
+					echo "恢复失败！请检查目标路径是否存在。"
+				fi
+				break
+			else
+				echo "无效输入，请重新选择。"
+			fi
+		done
+    done
+	COLUMNS=$OLD_COLUMNS
+}
+
+while getopts "frR" opt; do
+    case $opt in
+        f) 
+            if [ "$mode" != "default" ]; then
+                echo "error: -f, -R, and default mode are mutually exclusive"
+                exit 1
+            fi
+            mode="f" 
+            ;;
+        r) flag_r=true ;;
+        R) 
+            if [ "$mode" != "default" ]; then
+                echo "error: -f, -R, and default mode are mutually exclusive"
+                exit 1
+            fi
+            mode="R" 
+            ;;
+        *) 
+            echo "unknown option: -$opt"
+            exit 1
+            ;;
+    esac
 done
 
 shift $((OPTIND - 1))
-for file in "$@"
-do
-	target_name="$(basename $file)"
-	abs_path="$(realpath -s $file)"
-	if [ "${flag_R}" = "true" ]
-	then
-		OLD_COLUMNS=$COLUMNS
-		COLUMNS=1
-		result=()
-		mapfile -t matched_records < <(grep "${target_name}" "$delInfo" | tac)
-		select chosen in "${matched_records[@]}" "cancel"
-		do
-			if [ "${chosen}" = "cancel" ]
-			then
-				break
-			else
-				break
-			fi
-		done
-		COLUMNS=$OLD_COLUMNS
-		continue
-	fi
 
-	if [ -d "$file" ] && [ "$flag_r" != "true" ]
-	then
-		echo "can't junk dir, use -r instead"
-		continue
-	fi
-
-	if [ "$flag_f" = "true" ]
-	then
-		act="rm"
-		if [ -d "$file" ]
-		then
-			arg=("-rf" "$file")
-		else
-			arg=("-f" "$file")
-		fi
-	else
-		act="mv"
-		arg=("$file" "$trash")
-		if [ -e "$trash/$(basename $file)" ]
-		then
-			target_name="${target_name}_$(date +%s)"
-			target_path="$trash/${target_name}"
-			arg=("$file" "$target_path")
-		fi
-	fi
-	
-	"$act" "${arg[@]}"
-	if [ $? -eq 0 ]
-	then
-		echo "${target_name}|${abs_path}" >> "${delInfo}"
-		echo "successfully junked: $file"
-	else
-		echo "error: failed to junk: $file"
-	fi
-done	
+case "$mode" in
+    R) R_mode "$@" ;;
+    f) f_mode "$@" ;;
+    default) default_mode "$@" ;;
+esac
 	
 		
 	
