@@ -1,0 +1,89 @@
+#!/bin/bash
+if [ $# -eq 0 ]
+then
+	echo "error: need at least 1 arg"
+fi
+
+flag_f=false
+flag_r=false
+flag_R=false
+trash="./trash"
+delInfo="./trash/delInfo"
+act="mv"
+arg=()
+
+mkdir -p "$trash"
+
+while getopts "frR" opt
+do
+	case $opt in
+		f) flag_f=true ;;
+		r) flag_r=true ;;
+		R) flag_R=true ;;
+		*) echo "unknown option: -$opt";exit 1;;
+	esac
+done
+
+shift $((OPTIND - 1))
+for file in "$@"
+do
+	target_name="$(basename $file)"
+	abs_path="$(realpath -s $file)"
+	if [ "${flag_R}" = "true" ]
+	then
+		OLD_COLUMNS=$COLUMNS
+		COLUMNS=1
+		result=()
+		mapfile -t matched_records < <(grep "${target_name}" "$delInfo" | tac)
+		select chosen in "${matched_records[@]}" "cancel"
+		do
+			if [ "${chosen}" = "cancel" ]
+			then
+				break
+			else
+				break
+			fi
+		done
+		COLUMNS=$OLD_COLUMNS
+		continue
+	fi
+
+	if [ -d "$file" ] && [ "$flag_r" != "true" ]
+	then
+		echo "can't junk dir, use -r instead"
+		continue
+	fi
+
+	if [ "$flag_f" = "true" ]
+	then
+		act="rm"
+		if [ -d "$file" ]
+		then
+			arg=("-rf" "$file")
+		else
+			arg=("-f" "$file")
+		fi
+	else
+		act="mv"
+		arg=("$file" "$trash")
+		if [ -e "$trash/$(basename $file)" ]
+		then
+			target_name="${target_name}_$(date +%s)"
+			target_path="$trash/${target_name}"
+			arg=("$file" "$target_path")
+		fi
+	fi
+	
+	"$act" "${arg[@]}"
+	if [ $? -eq 0 ]
+	then
+		echo "${target_name}|${abs_path}" >> "${delInfo}"
+		echo "successfully junked: $file"
+	else
+		echo "error: failed to junk: $file"
+	fi
+done	
+	
+		
+	
+
