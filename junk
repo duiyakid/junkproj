@@ -87,24 +87,35 @@ R_mode(){
 			then
                 del_time="$(stat -c '%y' "$trash/$target_name" 2>/dev/null | cut -d'.' -f1)"
             fi
-            display+=("${src_name} ${ori_path} ${del_time}")
+            display+=("${target_name} ${ori_path} ${del_time}")
 		done
 
-		PS3="请选择要恢复的版本 (输入编号): "
-		select item in "${display[@]}" "cancel"; do
+		PS3="选择恢复版本 (输入编号): "
+		select item in "${display[@]}" "cancel"
+		do
 			if [[ "$item" == "cancel" ]]
 			then
-				echo "操作已取消。"
 				break
 			elif [[ -n "$item" ]]
 			then
 				local index=$((REPLY - 1))
 				IFS='|' read -r target_name ori_path <<< "${result[$index]}"
 
-				if [ -e "${ori_path}" ]
+				# if [ -e "${ori_path}" ]
+				# then
+				# 	echo "error: 已存在同名文件"
+				# 	continue
+				# fi
+
+				if [ -e "${ori_path}" ] || [ -d "${ori_path}" ]
 				then
-					echo "error: 已存在同名文件"
-					continue
+					echo "warning: 目标路径已存在: $ori_path"
+					read -p "是否覆盖？(y/n): " confirm
+					if [[ "$confirm" != "y" && "$confirm" != "Y" ]]
+					then
+						echo "操作已取消。"
+						continue
+					fi
 				fi
 				
 				if mv "$trash/$target_name" "$ori_path"
