@@ -80,13 +80,17 @@ R_mode(){
 
 		PS3="请选择要恢复的版本 (输入编号): "
 		select item in "${result[@]}" "cancel"; do
-			if [[ "$item" == "cancel" ]]; then
+			if [[ "$item" == "cancel" ]]
+			then
 				echo "操作已取消。"
 				break
-			elif [[ -n "$item" ]]; then
+			elif [[ -n "$item" ]]
+			then
 				IFS='|' read -r target_name ori_path <<< "${item}"
 				
-				if mv "$trash/$target_name" "$ori_path"; then
+				if mv "$trash/$target_name" "$ori_path"
+				then
+					sed -i "\#${target_name}|${ori_path}#d" "$delInfo"
 					echo "成功恢复: $ori_path"
 				else
 					echo "恢复失败！请检查目标路径是否存在。"
