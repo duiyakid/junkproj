@@ -238,7 +238,52 @@ s_mode(){
 
 	COLUMNS=$OLD_COLUMNS
 }
-while getopts "frRs" opt; do
+
+d_mode(){
+
+	echo "警告: 这将永久删除回收站中您的所有文件！"
+    read -p "确认清空？(y/N): " confirm
+    
+    if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+        echo "操作已取消"
+        return 0
+    fi
+
+	mapfile -t all_result < <(
+	tac "$delInfo" )
+
+	local filtered_result=()
+
+	for item in "${all_result[@]}"; do
+		IFS='|' read -r target_name ori_path <<< "$item"
+		if [ -e "$trash/$target_name" ] && check_owner "$trash/$target_name"; then
+			filtered_result+=("$item")
+		fi
+	done
+	
+	# 用过滤后的结果替换
+	result=("${filtered_result[@]}")
+
+	if [ ${#result[@]} -eq 0 ]
+	then
+	 	echo "回收站已为空"
+        return 0
+	fi
+
+	for dis in "${result[@]}"
+	do
+		IFS='|' read -r target_name ori_path <<< "${dis}"
+		if rm -rf "$trash/$target_name"
+			then
+				sed -i "\#${target_name}|${ori_path}#d" "$delInfo"
+			else
+				echo "error: 删除文件失败: ${target_name}"
+				continue
+			fi
+	done
+
+}
+while getopts "frRsd" opt; do
     case $opt in
         f) 
             if [ "$mode" != "default" ]; then
@@ -261,6 +306,12 @@ while getopts "frRs" opt; do
             fi
             mode="s" 
             ;;
+		d)	if [ "$mode" != "default" ]; then
+                echo "error: -f, -R, -s and default mode are mutually exclusive"
+                exit 1
+            fi
+            mode="d" 
+            ;;
         *) 
             echo "unknown option: -$opt"
             exit 1
@@ -274,6 +325,7 @@ case "$mode" in
     R) R_mode "$@" ;;
     f) f_mode "$@" ;;
 	s) s_mode ;;
+	d) d_mode ;;
     default) default_mode "$@" ;;
 esac
 	
