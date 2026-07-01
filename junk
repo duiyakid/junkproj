@@ -31,7 +31,8 @@ fi
 
 check_owner() {
 	local file="$1"
-	if [ ! -e "$file" ]; then
+
+	if [ ! -e "$file" ] && [ ! -L "$file" ]; then
         return 1
     fi
     
@@ -255,7 +256,7 @@ s_mode(){
 		IFS='|' read -r target_name ori_path <<< "${dis}"
 		local del_time="未知时间"
 		local file_size="未知大小"
-		if [ -e "$trash/$target_name" ]
+		if [ -e "$trash/$target_name" ] || [ -L "$trash/$target_name" ]
 		then
 			del_time="$(stat -c '%y' "$trash/$target_name" 2>/dev/null | cut -d'.' -f1)"
 			del_time="${del_time:-未知时间}"
