@@ -11,7 +11,15 @@ flag_R=false
 trash="/trash"
 delInfo="/trash/delInfo"
 mode="default"
-mkdir -p "$trash"
+if [ ! -e "$trash" ]; then
+    echo "error: /trash not exists, contact admin"
+    exit 1
+fi
+
+if [ ! -e "$delInfo" ]; then
+    echo "error: /trash/delInfo not exists, contact admin"
+    exit 1
+fi
 check_owner() {
     local file="$1"
     local current_user=$(whoami)
