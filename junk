@@ -1,4 +1,11 @@
 #!/bin/bash
+
+if [ "$EUID" -ne 0 ]; then
+    # 不是 root，自动用 sudo 重新执行
+    exec sudo "$0" "$@"
+    exit $?
+fi
+
 if [ $# -eq 0 ]
 then
 	echo "错误：需要至少一个参数"
@@ -28,7 +35,7 @@ check_owner() {
         return 1
     fi
     
-    local current_user=$(whoami)
+    local current_user="${SUDO_USER:-$(whoami)}"
     local file_owner=$(stat -c '%U' "$file" 2>/dev/null)
     
     if [ "$file_owner" != "$current_user" ]; then
