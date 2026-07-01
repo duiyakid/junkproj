@@ -199,10 +199,11 @@ s_mode(){
 		if [ -e "$trash/$target_name" ]
 		then
 			del_time="$(stat -c '%y' "$trash/$target_name" 2>/dev/null | cut -d'.' -f1)"
-			file_size="$(du -sh -h "$trash/$target_name" 2>/dev/null | cut -f1)"
+			file_size="$(du -sh "$trash/$target_name" 2>/dev/null | cut -f1)"
 		fi
 		display+=("${del_time} ${file_size} ${target_name} ${ori_path}")
 	done
+	echo "总计 ${#result[@]}"
 
 	PS3="选择文件(输入编号): "
 	select item in "${display[@]}" "cancel"
