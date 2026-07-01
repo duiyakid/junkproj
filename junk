@@ -164,11 +164,84 @@ R_mode(){
 	COLUMNS=$OLD_COLUMNS
 }
 
-while getopts "frR" opt; do
+s_mode(){
+	OLD_COLUMNS="${COLUMNS}"
+	COLUMNS=1
+	
+	local filtered_result=()
+
+	mapfile -t all_result < <(
+	tac "$delInfo" )
+
+	for item in "${all_result[@]}"; do
+		IFS='|' read -r target_name ori_path <<< "$item"
+		if [ -e "$trash/$target_name" ] && check_owner "$trash/$target_name"; then
+			filtered_result+=("$item")
+		fi
+	done
+	
+	# 用过滤后的结果替换
+	result=("${filtered_result[@]}")
+
+	if [ ${#result[@]} -eq 0 ]
+	then
+		echo "no file in trash"
+		return 1
+	fi
+
+	display=()
+
+	for dis in "${result[@]}"
+	do
+		IFS='|' read -r target_name ori_path <<< "${dis}"
+		local del_time="未知时间"
+		local file_size="未知大小"
+		if [ -e "$trash/$target_name" ]
+		then
+			del_time="$(stat -c '%y' "$trash/$target_name" 2>/dev/null | cut -d'.' -f1)"
+			file_size="$(du -sh -h "$trash/$target_name" 2>/dev/null | cut -f1)"
+		fi
+		display+=("${del_time} ${file_size} ${target_name} ${ori_path}")
+	done
+
+	PS3="选择文件(输入编号): "
+	select item in "${display[@]}" "cancel"
+	do
+		if [[ "$item" == "cancel" ]]
+		then
+			break
+		elif [[ -n "$item" ]]
+		then
+			local index=$((REPLY - 1))
+			IFS='|' read -r target_name ori_path <<< "${result[$index]}"
+			target_path="${trash}/${target_name}"
+
+			if [ -d "${target_path}" ]
+			then
+				if ! ls -la  "${target_path}" | less
+				then
+					echo "error: can't print content of ${target_name}"
+				fi
+				continue
+			else
+				if ! less "$trash/$target_name"
+				then
+					echo "error: can't print content of ${target_name}"
+				fi
+				continue
+			fi
+		else
+			echo "无效输入，请重新选择。"
+		fi
+	done
+
+	COLUMNS=$OLD_COLUMNS
+}
+while getopts "frRs" opt; do
     case $opt in
         f) 
             if [ "$mode" != "default" ]; then
-                echo "error: -f, -R, and default mode are mutually exclusive"
+                echo "error: -f, -R, -s and default mode are mutually exclusive"
                 exit 1
             fi
             mode="f" 
@@ -176,10 +249,16 @@ while getopts "frR" opt; do
         r) flag_r=true ;;
         R) 
             if [ "$mode" != "default" ]; then
-                echo "error: -f, -R, and default mode are mutually exclusive"
+                echo "error: -f, -R, -s and default mode are mutually exclusive"
                 exit 1
             fi
             mode="R" 
+            ;;
+		s)	if [ "$mode" != "default" ]; then
+                echo "error: -f, -R, -s and default mode are mutually exclusive"
+                exit 1
+            fi
+            mode="s" 
             ;;
         *) 
             echo "unknown option: -$opt"
@@ -193,6 +272,7 @@ shift $((OPTIND - 1))
 case "$mode" in
     R) R_mode "$@" ;;
     f) f_mode "$@" ;;
+	s) s_mode ;;
     default) default_mode "$@" ;;
 esac
 	
