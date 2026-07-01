@@ -139,7 +139,8 @@ R_mode(){
 
 		for item in "${all_result[@]}"; do
 			IFS='|' read -r target_name ori_path <<< "$item"
-			if [ -e "$trash/$target_name" ] && check_owner "$trash/$target_name"; then
+			if check_owner "$trash/$target_name"
+			then
 				filtered_result+=("$item")
 			fi
 		done
@@ -149,41 +150,33 @@ R_mode(){
 
 		if [ ${#result[@]} -eq 0 ]
 		then
-        	echo "no such file in trash"
+        	echo "错误: /trash 没有匹配文件: ${src_name}"
         	continue
     	fi
 
-		display=()
-
+		local display=()
 		for dis in "${result[@]}"
 		do
 			IFS='|' read -r target_name ori_path <<< "${dis}"
 			local del_time="未知时间"
-            if [ -e "$trash/$target_name" ]
-			then
-                del_time="$(stat -c '%y' "$trash/$target_name" 2>/dev/null | cut -d'.' -f1)"
-            fi
+            del_time="$(stat -c '%y' "$trash/$target_name" 2>/dev/null | cut -d'.' -f1)"
+			del_time="${del_time:-未知时间}"
             display+=("${target_name} ${ori_path} ${del_time}")
 		done
 
-		PS3="选择恢复版本 (输入编号): "
+		PS3="选择恢复版本(编号): "
 		select item in "${display[@]}" "cancel"
 		do
-			if [[ "$item" == "cancel" ]]
+			if [ "$item" == "cancel" ]
 			then
 				break
-			elif [[ -n "$item" ]]
+			elif [ -n "$item" ]
 			then
 				local index=$((REPLY - 1))
 				IFS='|' read -r target_name ori_path <<< "${result[$index]}"
 
-				# if [ -e "${ori_path}" ]
-				# then
-				# 	echo "error: 已存在同名文件"
-				# 	continue
-				# fi
 
-				if [ -e "${ori_path}" ] || [ -d "${ori_path}" ]
+				if [ -e "${ori_path}" ]
 				then
 					echo "warning: 目标路径已存在: $ori_path"
 					read -p "是否覆盖？(y/n): " confirm
