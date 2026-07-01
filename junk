@@ -340,7 +340,7 @@ while getopts "frRsd" opt; do
     case $opt in
         f) 
             if [ "$mode" != "default" ]; then
-                echo "error: -f, -R, -s and default mode are mutually exclusive"
+                echo "错误: -f, -R, -s, -d 参数不支持混用"
                 exit 1
             fi
             mode="f" 
@@ -348,25 +348,25 @@ while getopts "frRsd" opt; do
         r) flag_r=true ;;
         R) 
             if [ "$mode" != "default" ]; then
-                echo "error: -f, -R, -s and default mode are mutually exclusive"
+                echo "错误: -f, -R, -s, -d 参数不支持混用"
                 exit 1
             fi
             mode="R" 
             ;;
 		s)	if [ "$mode" != "default" ]; then
-                echo "error: -f, -R, -s and default mode are mutually exclusive"
+                echo "错误: -f, -R, -s,-d 参数不支持混用"
                 exit 1
             fi
             mode="s" 
             ;;
 		d)	if [ "$mode" != "default" ]; then
-                echo "error: -f, -R, -s and default mode are mutually exclusive"
+                echo "错误: -f, -R, -s, -d 参数不支持混用"
                 exit 1
             fi
             mode="d" 
             ;;
         *) 
-            echo "unknown option: -$opt"
+            echo "未知的选项: -${opt}"
             exit 1
             ;;
     esac
