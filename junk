@@ -24,6 +24,11 @@ check_owner() {
     local file="$1"
     local current_user=$(whoami)
     local file_owner=$(stat -c '%U' "$file" 2>/dev/null)
+
+	if [ ! -e "$file" ]; then
+        echo "error: file not found: $file"
+        return 2
+    fi
     
     if [ "$file_owner" != "$current_user" ]; then
         return 1
