@@ -131,7 +131,7 @@ R_mode(){
 	do
 		local src_name="$(basename "${file}")"
 		local target_name="${src_name}"
-		local target_path="$trash/${src_name}"
+		# local target_path="$trash/${src_name}"
 		local filtered_result=()
 
 		mapfile -t all_result < <(
@@ -146,7 +146,7 @@ R_mode(){
 		done
 		
 		# 用过滤后的结果替换
-		result=("${filtered_result[@]}")
+		local result=("${filtered_result[@]}")
 
 		if [ ${#result[@]} -eq 0 ]
 		then
@@ -165,9 +165,9 @@ R_mode(){
 		done
 
 		PS3="选择恢复版本(编号): "
-		select item in "${display[@]}" "cancel"
+		select item in "${display[@]}" "取消"
 		do
-			if [ "$item" == "cancel" ]
+			if [ "$item" == "取消" ]
 			then
 				break
 			elif [ -n "$item" ]
@@ -175,28 +175,39 @@ R_mode(){
 				local index=$((REPLY - 1))
 				IFS='|' read -r target_name ori_path <<< "${result[$index]}"
 
-
-				if [ -e "${ori_path}" ]
-				then
-					echo "warning: 目标路径已存在: $ori_path"
+				check_owner "${ori_path}"
+				local code=$?
+				case ${code} in
+				0) 
+					echo "警告: 目标文件已存在: ${ori_path}"
 					read -p "是否覆盖？(y/n): " confirm
 					if [[ "$confirm" != "y" && "$confirm" != "Y" ]]
 					then
-						echo "操作已取消。"
+						echo "操作已取消"
 						continue
 					fi
-				fi
+					;;
+				1)
+					;;
+				2)
+					echo "错误：目标文件已存在，且权限不足: ${ori_path}" >&2
+					continue
+					;;
+				*)
+					echo "错误：未知错误($code)" >&2
+					continue
+					;;
+				esac
 				
 				if mv "$trash/$target_name" "$ori_path"
 				then
-					sed -i "\#${target_name}|${ori_path}#d" "$delInfo"
-					echo "成功恢复: $ori_path"
+					sudo sed -i "\#${target_name}|${ori_path}#d" "$delInfo"
 				else
-					echo "恢复失败！请检查目标路径是否存在。"
+					echo "错误: 未知错误($?), 恢复失败: ${ori_path}"
 				fi
 				break
 			else
-				echo "无效输入，请重新选择。"
+				echo "无效输入，请重新选择"
 			fi
 		done
     done
@@ -212,23 +223,25 @@ s_mode(){
 	mapfile -t all_result < <(
 	tac "$delInfo" )
 
-	for item in "${all_result[@]}"; do
+	for item in "${all_result[@]}"
+	do
 		IFS='|' read -r target_name ori_path <<< "$item"
-		if [ -e "$trash/$target_name" ] && check_owner "$trash/$target_name"; then
+		if check_owner "$trash/$target_name"
+		then
 			filtered_result+=("$item")
 		fi
 	done
 	
 	# 用过滤后的结果替换
-	result=("${filtered_result[@]}")
+	local result=("${filtered_result[@]}")
 
 	if [ ${#result[@]} -eq 0 ]
 	then
-		echo "no file in trash"
-		return 1
+		echo "回收站为空"
+		return 0
 	fi
 
-	display=()
+	local display=()
 
 	for dis in "${result[@]}"
 	do
@@ -238,16 +251,17 @@ s_mode(){
 		if [ -e "$trash/$target_name" ]
 		then
 			del_time="$(stat -c '%y' "$trash/$target_name" 2>/dev/null | cut -d'.' -f1)"
+			del_time="${del_time:-未知时间}"
 			file_size="$(du -sh "$trash/$target_name" 2>/dev/null | cut -f1)"
 		fi
 		display+=("${del_time} ${file_size} ${target_name} ${ori_path}")
 	done
 	echo "总计 ${#result[@]}"
 
-	PS3="选择文件(输入编号): "
-	select item in "${display[@]}" "cancel"
+	PS3="选择文件(编号): "
+	select item in "${display[@]}" "取消"
 	do
-		if [[ "$item" == "cancel" ]]
+		if [[ "$item" == "取消" ]]
 		then
 			break
 		elif [[ -n "$item" ]]
@@ -260,18 +274,18 @@ s_mode(){
 			then
 				if ! ls -la  "${target_path}" | less
 				then
-					echo "error: can't print content of ${target_name}"
+					echo "错误: 无法显示文件内容: ${target_name}"
 				fi
 				continue
 			else
 				if ! less "$trash/$target_name"
 				then
-					echo "error: can't print content of ${target_name}"
+					echo "错误: 无法显示文件内容: ${target_name}"
 				fi
 				continue
 			fi
 		else
-			echo "无效输入，请重新选择。"
+			echo "无效输入，请重新选择"
 		fi
 	done
 
@@ -282,7 +296,6 @@ d_mode(){
 
 	echo "警告: 这将永久删除回收站中您的所有文件！"
     read -p "确认清空？(y/N): " confirm
-    
     if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
         echo "操作已取消"
         return 0
@@ -295,13 +308,14 @@ d_mode(){
 
 	for item in "${all_result[@]}"; do
 		IFS='|' read -r target_name ori_path <<< "$item"
-		if [ -e "$trash/$target_name" ] && check_owner "$trash/$target_name"; then
+		if check_owner "$trash/$target_name"
+		then
 			filtered_result+=("$item")
 		fi
 	done
 	
 	# 用过滤后的结果替换
-	result=("${filtered_result[@]}")
+	local result=("${filtered_result[@]}")
 
 	if [ ${#result[@]} -eq 0 ]
 	then
@@ -314,9 +328,9 @@ d_mode(){
 		IFS='|' read -r target_name ori_path <<< "${dis}"
 		if rm -rf "$trash/$target_name"
 			then
-				sed -i "\#${target_name}|${ori_path}#d" "$delInfo"
+				sudo sed -i "\#${target_name}|${ori_path}#d" "$delInfo"
 			else
-				echo "error: 删除文件失败: ${target_name}"
+				echo "错误: 删除文件失败: ${target_name}"
 				continue
 			fi
 	done
