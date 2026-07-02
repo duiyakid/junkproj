@@ -188,13 +188,15 @@ R_mode(){
 			IFS='|' read -r target_name ori_path <<< "${dis}"
 			local del_time="未知时间"
 			local file_size="未知大小"
+			local type_char="?"
 			if [ -e "$trash/$target_name" ] || [ -L "$trash/$target_name" ]
 			then
 				del_time="$(stat -c '%y' "$trash/$target_name" 2>/dev/null | cut -d'.' -f1)"
 				del_time="${del_time:-未知时间}"
 				file_size="$(du -sh "$trash/$target_name" 2>/dev/null | cut -f1)"
+				type_char=$(ls -ld "$trash/$target_name" 2>/dev/null | cut -c1)
 			fi
-			temp_data+=("${del_time}|${file_size}|${target_name}|${ori_path}")
+			temp_data+=("${del_time}|${type_char}|${file_size}|${target_name}|${ori_path}")
 			local size_len=$(echo -n "$file_size" | wc -c)
 			local name_len=$(echo -n "$target_name" | wc -c)
 			
@@ -211,9 +213,9 @@ R_mode(){
 
 		for data in "${temp_data[@]}"
 		do
-			IFS='|' read -r del_time file_size target_name ori_path <<< "$data"
+			IFS='|' read -r del_time type_char file_size target_name ori_path <<< "$data"
 			# 时间列直接原样输出，大小和文件名列对齐
-			display+=("$del_time  $(printf "%-${max_size}s %-${max_name}s %s" "$file_size" "$target_name" "$ori_path")")
+			display+=("$del_time  $type_char  $(printf "%-${max_size}s %-${max_name}s %s" "$file_size" "$target_name" "$ori_path")")
 		done
 
 		PS3="选择恢复版本(编号): "
@@ -302,13 +304,15 @@ s_mode(){
 		IFS='|' read -r target_name ori_path <<< "${dis}"
 		local del_time="未知时间"
 		local file_size="未知大小"
+		local type_char="?"
 		if [ -e "$trash/$target_name" ] || [ -L "$trash/$target_name" ]
 		then
 			del_time="$(stat -c '%y' "$trash/$target_name" 2>/dev/null | cut -d'.' -f1)"
 			del_time="${del_time:-未知时间}"
 			file_size="$(du -sh "$trash/$target_name" 2>/dev/null | cut -f1)"
+			type_char=$(ls -ld "$trash/$target_name" 2>/dev/null | cut -c1)
 		fi
-		temp_data+=("${del_time}|${file_size}|${target_name}|${ori_path}")
+		temp_data+=("${del_time}|${type_char}|${file_size}|${target_name}|${ori_path}")
 		local size_len=$(echo -n "$file_size" | wc -c)
 		local name_len=$(echo -n "$target_name" | wc -c)
 		
@@ -325,9 +329,9 @@ s_mode(){
 
 	for data in "${temp_data[@]}"
 	do
-		IFS='|' read -r del_time file_size target_name ori_path <<< "$data"
+		IFS='|' read -r del_time type_char file_size target_name ori_path <<< "$data"
 		# 时间列直接原样输出，大小和文件名列对齐
-		display+=("$del_time  $(printf "%-${max_size}s %-${max_name}s %s" "$file_size" "$target_name"  "$ori_path")")
+		display+=("$del_time  $type_char  $(printf "%-${max_size}s %-${max_name}s %s" "$file_size" "$target_name"  "$ori_path")")
 	done
 
 	PS3="选择文件(编号): "
