@@ -1,22 +1,22 @@
 #!/bin/bash
 
-# LOCK_FILE="/var/lock/recycle.lock"
-# TIMEOUT=3  # 3秒超时足够了
-
-# exec 200>"$LOCK_FILE"
-# if flock -w $TIMEOUT 200; then
-#     # 获取锁成功，继续执行
-#     :
-# else
-#     echo "错误: 回收站正忙，请稍后再试" >&2
-#     exit 1
-# fi
-
 if [ "$EUID" -ne 0 ]; then
     # 不是 root，自动用 sudo 重新执行
     exec sudo "$0" "$@"
     exit $?
 fi
+
+LOCK_FILE="/var/lock/recycle.lock"
+TIMEOUT=3
+
+trap 'rm -f "$LOCK_FILE"; exit' EXIT INT TERM TSTP
+
+exec 200>"$LOCK_FILE"
+if ! flock -w $TIMEOUT 200; then
+    echo "错误: 回收站正忙" >&2
+    exit 1
+fi
+echo $$ > "$LOCK_FILE"
 
 if [ $# -eq 0 ]
 then
