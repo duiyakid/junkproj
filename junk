@@ -163,13 +163,40 @@ R_mode(){
     	fi
 
 		local display=()
+		local -a temp_data=()
+		local max_size=0 max_name=0
+
 		for dis in "${result[@]}"
 		do
 			IFS='|' read -r target_name ori_path <<< "${dis}"
 			local del_time="未知时间"
-            del_time="$(stat -c '%y' "$trash/$target_name" 2>/dev/null | cut -d'.' -f1)"
-			del_time="${del_time:-未知时间}"
-            display+=("${target_name} ${ori_path} ${del_time}")
+			local file_size="未知大小"
+			if [ -e "$trash/$target_name" ] || [ -L "$trash/$target_name" ]
+			then
+				del_time="$(stat -c '%y' "$trash/$target_name" 2>/dev/null | cut -d'.' -f1)"
+				del_time="${del_time:-未知时间}"
+				file_size="$(du -sh "$trash/$target_name" 2>/dev/null | cut -f1)"
+			fi
+			temp_data+=("${del_time}|${file_size}|${target_name}|${ori_path}")
+			local size_len=$(echo -n "$file_size" | wc -c)
+			local name_len=$(echo -n "$target_name" | wc -c)
+			
+			# [ $size_len -gt $max_size ] && max_size=$size_len+1
+			# [ $name_len -gt $max_name ] && max_name=$name_len+1
+			[ $size_len -gt $max_size ] && max_size=$((size_len + 1))
+			[ $name_len -gt $max_name ] && max_name=$((name_len + 1))
+			# display+=("${del_time} ${file_size} ${target_name} ${ori_path}")
+		done
+		echo "总计 ${#result[@]}"
+		# 设置大小和文件名的最小宽度
+		# [ $max_size -lt 8 ] && max_size=5    # 大小列最小8个字符
+		# [ $max_name -lt 10 ] && max_name=3  # 文件名列最小10个字符
+
+		for data in "${temp_data[@]}"
+		do
+			IFS='|' read -r del_time file_size target_name ori_path <<< "$data"
+			# 时间列直接原样输出，大小和文件名列对齐
+			display+=("$del_time  $(printf "%-${max_size}s %-${max_name}s %s" "$file_size" "$target_name" "$ori_path")")
 		done
 
 		PS3="选择恢复版本(编号): "
@@ -250,6 +277,8 @@ s_mode(){
 	fi
 
 	local display=()
+	local -a temp_data=()
+	local max_size=0 max_name=0
 
 	for dis in "${result[@]}"
 	do
@@ -262,9 +291,27 @@ s_mode(){
 			del_time="${del_time:-未知时间}"
 			file_size="$(du -sh "$trash/$target_name" 2>/dev/null | cut -f1)"
 		fi
-		display+=("${del_time} ${file_size} ${target_name} ${ori_path}")
+		temp_data+=("${del_time}|${file_size}|${target_name}|${ori_path}")
+		local size_len=$(echo -n "$file_size" | wc -c)
+		local name_len=$(echo -n "$target_name" | wc -c)
+		
+		# [ $size_len -gt $max_size ] && max_size=$size_len
+		# [ $name_len -gt $max_name ] && max_name=$name_len
+		[ $size_len -gt $max_size ] && max_size=$((size_len + 1))
+		[ $name_len -gt $max_name ] && max_name=$((name_len + 1))
+		# display+=("${del_time} ${file_size} ${target_name} ${ori_path}")
 	done
 	echo "总计 ${#result[@]}"
+	# 设置大小和文件名的最小宽度
+	# [ $max_size -lt 8 ] && max_size=5    # 大小列最小8个字符
+	# [ $max_name -lt 10 ] && max_name=3  # 文件名列最小10个字符
+
+	for data in "${temp_data[@]}"
+	do
+		IFS='|' read -r del_time file_size target_name ori_path <<< "$data"
+		# 时间列直接原样输出，大小和文件名列对齐
+		display+=("$del_time  $(printf "%-${max_size}s %-${max_name}s %s" "$file_size" "$target_name"  "$ori_path")")
+	done
 
 	PS3="选择文件(编号): "
 	select item in "${display[@]}" "取消"
