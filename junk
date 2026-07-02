@@ -1,5 +1,17 @@
 #!/bin/bash
 
+# LOCK_FILE="/var/lock/recycle.lock"
+# TIMEOUT=3  # 3秒超时足够了
+
+# exec 200>"$LOCK_FILE"
+# if flock -w $TIMEOUT 200; then
+#     # 获取锁成功，继续执行
+#     :
+# else
+#     echo "错误: 回收站正忙，请稍后再试" >&2
+#     exit 1
+# fi
+
 if [ "$EUID" -ne 0 ]; then
     # 不是 root，自动用 sudo 重新执行
     exec sudo "$0" "$@"
@@ -11,6 +23,10 @@ then
 	echo "错误：需要至少一个参数"
 	exit 1
 fi
+
+
+
+
 
 # 判断参数
 flag_r=false
@@ -143,7 +159,8 @@ R_mode(){
 		local filtered_result=()
 
 		mapfile -t all_result < <(
-        grep "^${target_name}" "$delInfo" | tac )
+        # grep "^${target_name}" "$delInfo" | tac )
+		awk -F'|' -v target="${target_name}" 'index($1, target) == 1' "$delInfo" | tac )
 
 		for item in "${all_result[@]}"; do
 			IFS='|' read -r target_name ori_path <<< "$item"
