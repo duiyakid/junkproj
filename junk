@@ -56,8 +56,7 @@ then
     exit 1
 fi
 
-# ===== 工具函数：检查文件所有者 =====
-# 参数：$1 - 要检查的文件路径
+# 检查文件存在性以及权限
 # 返回值：0-属于当前用户  1-文件不存在  2-权限不足（属于其他用户）
 check_owner()
 {
@@ -84,10 +83,10 @@ check_owner()
     return 0
 }
 
-# ===== 模式1：默认删除模式（将文件移入回收站） =====
+# 默认删除模式（将文件移入回收站）
 default_mode()
 {
-    # 遍历所有传入的文件/目录参数
+
     for file in "$@"
     do
         # 检查文件所有权
@@ -124,14 +123,15 @@ default_mode()
         local target_name="${src_name}"                  # 回收站中的文件名
         local target_path="${trash}/${src_name}"         # 回收站中的完整路径
         
-        # 处理重名文件：添加时间戳后缀避免覆盖已有文件
+        # 处理重名文件：添加时间戳后缀避免覆盖已有文件，实现多版本共存
+		# 同时不全部添加时间戳是因为可以马上区分最开始的文件
         while [ -e "$target_path" ]
         do
-            target_name="${src_name}_$(date +%s)"       # 文件名_Unix时间戳
+            target_name="${src_name}_$(date +%s)"
             target_path="${trash}/${target_name}"
         done
 
-        # 移动文件到回收站
+ 
         if mv "$file" "$target_path"
         then
             # 记录删除信息：回收站文件名|原始路径
@@ -142,7 +142,7 @@ default_mode()
     done
 }
 
-# ===== 模式2：强制删除模式（永久删除，不进回收站） =====
+# 强制删除模式（永久删除，不进回收站）
 f_mode()
 {
     for file in "$@"
@@ -185,10 +185,11 @@ f_mode()
     done
 }
 
-# ===== 模式3：恢复模式（从回收站恢复文件） =====
+# 恢复模式（从回收站恢复文件）
 R_mode()
 {
     # 保存当前终端列数并设置为1，优化 select 菜单显示
+	# 如果不设置，经测试会出现1 3 在同一行这样的问题
     OLD_COLUMNS="${COLUMNS}"
     COLUMNS=1
     
@@ -199,8 +200,12 @@ R_mode()
         local filtered_result=()
 
         # 从 delInfo 中查找匹配的文件记录
-        # awk: 以 | 分隔，$1 是回收站文件名，匹配以 target 开头的行
+        # awk: 以 | 分隔，$1 是回收站文件名，匹配以 target 开头的行，index比对返回位置结果
+		# 不使用grep，因为grep会解析正则表达式，导致读取出现问题
         # tac: 反转顺序，最近删除的排在前面
+		# mapfile: 将命令输出按行读入数组
+		# -t: 去掉每行末尾的换行符
+		# < <(...): 进程替换，将命令输出作为标准输入
         mapfile -t all_result < <(
             awk -F'|' -v target="${target_name}" 'index($1, target) == 1' "$delInfo" | tac
         )
@@ -208,6 +213,7 @@ R_mode()
         # 过滤：只保留属于当前用户的文件
         for item in "${all_result[@]}"
         do
+			# 临时设置分隔符为|用来切分后读入变量
             IFS='|' read -r target_name ori_path <<< "$item"
             if check_owner "$trash/$target_name"
             then
@@ -218,7 +224,7 @@ R_mode()
         # 使用过滤后的结果
         local result=("${filtered_result[@]}")
 
-        # 检查是否找到匹配文件
+        # 检查是否找到匹配文件（数量不为0）
         if [ ${#result[@]} -eq 0 ]
         then
             echo "错误: /trash 没有匹配文件: ${src_name}"
@@ -242,12 +248,16 @@ R_mode()
             # 如果文件在回收站中存在（包括符号链接）
             if [ -e "$trash/$target_name" ] || [ -L "$trash/$target_name" ]
             then
-                # 获取文件修改时间（即删除时间），去掉秒的小数部分
+                # 获取文件修改时间（即删除时间），是能被mv修改的最后状态时间%z ctime
+				# cut -d 指定分隔符为.，去掉小数点后取前面部分，-f就是按字段划分
                 del_time="$(stat -c '%z' "$trash/$target_name" 2>/dev/null | cut -d'.' -f1)"
                 del_time="${del_time:-未知时间}"
-                # 获取文件大小（人类可读格式）
+                # 获取文件大小
+				# du -s 统计总数据，-h 自动转换单位
+				# cut 不指定分隔符因为du的输出分隔符就是cut的默认分隔符\t
                 file_size="$(du -sh "$trash/$target_name" 2>/dev/null | cut -f1)"
                 # 获取文件类型第一个字符
+				# cut -c 按位置取，获取第一个位置的字符 -c1
                 type_char=$(ls -ld "$trash/$target_name" 2>/dev/null | cut -c1)
             fi
             
@@ -255,6 +265,7 @@ R_mode()
             temp_data+=("${del_time}|${type_char}|${file_size}|${target_name}|${ori_path}")
             
             # 计算列宽，用于后续对齐显示
+			# wc -c 统计字数，即获取宽度
             local size_len=$(echo -n "$file_size" | wc -c)
             local name_len=$(echo -n "$target_name" | wc -c)
             
@@ -269,11 +280,12 @@ R_mode()
         for data in "${temp_data[@]}"
         do
             IFS='|' read -r del_time type_char file_size target_name ori_path <<< "$data"
-            # 格式：时间 类型 大小(对齐) 文件名(对齐) 原始路径
+            # 格式：时间 类型 大小(对齐) 文件名(对齐) 原始路径（最后一列不用对齐末尾）
             display+=("$del_time  $type_char  $(printf "%-${max_size}s %-${max_name}s %s" "$file_size" "$target_name" "$ori_path")")
         done
 
         # 创建交互式选择菜单
+		# PS3 就是输入前面的那串文字，默认是#? 
         PS3="选择恢复版本(编号): "
         select item in "${display[@]}" "取消"
         do
@@ -283,6 +295,7 @@ R_mode()
             elif [ -n "$item" ]
             then
                 # 计算用户在结果数组中的索引
+				# select从1开始计数（REPLY），所以索引-1
                 local index=$((REPLY - 1))
                 IFS='|' read -r target_name ori_path <<< "${result[$index]}"
 
@@ -318,6 +331,8 @@ R_mode()
                 if mv "$trash/$target_name" "$ori_path"
                 then
                     # 从 delInfo 记录文件中删除对应条目
+					# sed -i 直接修改行，不输出，d是删除
+					# \;指定分隔符，因为；不常用，默认是/但是记录有/就换掉了
                     sudo sed -i "\;${target_name}|${ori_path};d" "$delInfo"
                 else
                     echo "错误: 未知错误($?), 恢复失败: ${ori_path}"
@@ -333,7 +348,7 @@ R_mode()
     COLUMNS=$OLD_COLUMNS
 }
 
-# ===== 模式4：查看模式（浏览回收站中文件的内容） =====
+# 查看模式（浏览回收站中文件的内容)
 s_mode()
 {
     OLD_COLUMNS="${COLUMNS}"
@@ -437,7 +452,7 @@ s_mode()
     COLUMNS=$OLD_COLUMNS
 }
 
-# ===== 模式5：清空模式（永久删除回收站中当前用户的所有文件） =====
+# 清空模式（永久删除回收站中当前用户的所有文件）
 d_mode()
 {
     # 二次确认，防止误操作
@@ -488,13 +503,13 @@ d_mode()
     done
 }
 
-# ===== 命令行参数解析 =====
+# 命令行参数解析
 # 支持的选项：f(强制删除) r(递归) R(恢复) s(查看) d(清空)
 while getopts "frRsd" opt
 do
     case $opt in
         f)
-            # -f: 强制永久删除模式，不能与其他模式混用
+            # -f: 强制永久删除模式
             if [ "$mode" != "default" ]
             then
                 echo "错误: -f, -R, -s, -d 参数不支持混用"
@@ -544,7 +559,7 @@ done
 # 移除已处理的选项参数，剩下的 $@ 为文件名参数
 shift $((OPTIND - 1))
 
-# ===== 根据解析到的模式执行对应的函数 =====
+# 根据解析到的模式执行对应的函数
 case "$mode" in
     R)
         R_mode "$@"     # 恢复文件
