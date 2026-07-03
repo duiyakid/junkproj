@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# ===== 权限检查：确保以 root 权限运行 =====
+# 权限检查：确保以 root 权限运行
 if [ "$EUID" -ne 0 ]
 then
     # 不是 root，自动用 sudo 重新执行当前脚本
@@ -10,7 +10,7 @@ then
     exit $?
 fi
 
-# ===== 文件锁配置，防止并发执行 =====
+# 文件锁配置，防止并发执行
 LOCK_FILE="/var/lock/recycle.lock"  # 锁文件路径
 TIMEOUT=3                            # 获取锁的超时时间（秒）
 
@@ -36,7 +36,7 @@ then
     exit 1
 fi
 
-# ===== 初始化全局变量 =====
+ 
 flag_r=false              # -r 选项标志，允许递归删除目录
 trash="/trash"            # 回收站目录路径
 delInfo="/trash/delInfo"  # 删除信息记录文件（格式：回收站文件名|原始路径）
