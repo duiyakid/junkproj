@@ -20,7 +20,7 @@ then
     exit 1
 fi
 
-# ============ 步骤 1：创建回收站目录 ============
+# 步骤 1：创建回收站目录 
 echo -e "${GREEN}[1/5] 创建 /trash 目录...${NC}"
 
 # mkdir -p: 递归创建目录，如果父目录不存在也会创建
@@ -38,7 +38,7 @@ chmod 700 /trash
 
 echo -e "${GREEN}/trash 创建完成 (700)${NC}"
 
-# ============ 步骤 2：创建删除信息记录文件 ============
+# 步骤 2：创建删除信息记录文件
 echo -e "${GREEN}[2/5] 创建 /trash/delInfo...${NC}"
 
 # touch: 创建空文件，如果文件已存在则更新其访问/修改时间
@@ -55,7 +55,7 @@ chmod 600 /trash/delInfo
 
 echo -e "${GREEN}/trash/delInfo 创建完成 (600)${NC}"
 
-# ============ 步骤 3：安装 junk 主脚本 ============
+# 步骤 3：安装 junk 主脚本
 echo -e "${GREEN}[3/5] 安装 junk 到 /usr/local/bin/...${NC}"
 
 # 检查当前目录是否存在 junk 脚本
@@ -81,7 +81,7 @@ chmod 755 /usr/local/bin/junk
 
 echo -e "${GREEN}已安装到 /usr/local/bin/junk${NC}"
 
-# ============ 步骤 4：配置 sudo 免密权限 ============
+# 步骤 4：配置 sudo 免密权限
 echo -e "${GREEN}[4/5] 配置全局免密 sudo...${NC}"
 
 # sudoers 配置文件的路径
@@ -109,7 +109,7 @@ chmod 440 "$SUDOERS_FILE"
 
 echo -e "${GREEN}免密设置完成${NC}"
 
-# ============ 步骤 5：验证安装结果 ============
+# 步骤 5：验证安装结果 
 echo -e "${GREEN}[5/5] 验证安装...${NC}"
 
 # 逐个检查关键组件是否安装成功
